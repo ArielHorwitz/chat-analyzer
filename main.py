@@ -7,6 +7,7 @@ from util import parse_args, file_load, file_dump
 
 class Importer:
     CACHED_DF_NAME = 'cached_df.json'
+
     def __init__(self,
             import_file=None,
             output_folder=None,
@@ -55,24 +56,27 @@ class Importer:
         line_limit = 10**9 if line_limit is None else line_limit
         print(f'Processing whatsapp chat: {target_file} (max: {line_limit} lines)')
         chat_content = file_load(target_file)
-        chat_lines = chat_content.split('\n')[1:]
+        chat_lines = chat_content.split('\n')
         chat_df = pd.DataFrame(columns=['date', 'sender', 'message'])
         print(f'Number of lines in chat: {len(chat_lines)}')
         # Process messages
         for i, line in enumerate(chat_lines[:line_limit]):
             if i % 1000 == 0:
                 print(f'Processing line #{i}')
-            if ': ' not in line or ' - ' not in line:
-                chat_df.loc[len(chat_df.index)-1, 'message'] += f'\n{line}'
-                m = chat_df.loc[len(chat_df.index)-1, 'message']
-                continue
-            date, line = line.split(' - ', 1)
-            sender, message = line.split(': ', 1)
-            date = arrow.get(date, 'M/D/YY, HH:mm').format('YYYY-MM-DD HH:MM:SS')
-            chat_df.loc[len(chat_df.index)] = [date, sender, message]
+            try:
+                date, line = line.split(' - ', 1)
+                sender, message = line.split(': ', 1)
+                date = arrow.get(date, 'M/D/YY, HH:mm').format('YYYY-MM-DD HH:MM:SS')
+                chat_df.loc[len(chat_df.index)] = [date, sender, message]
+            except Exception:
+                if len(chat_df['date']) > 0:
+                    chat_df.loc[len(chat_df.index)-1, 'message'] += f'\n{line}'
+                else:
+                    print(f'Failed to process line: {line}')
 
         print(f'Post processing days...')
         chat_df['day'] = chat_df['date'].apply(lambda x: arrow.get(x).format('YYYY-MM-DD'))
+        chat_df['weekday'] = chat_df['date'].apply(lambda x: arrow.get(x).format('dddd'))
         print(f'Post processing hours...')
         chat_df['hour'] = chat_df['date'].apply(lambda x: arrow.get(x).format('HH'))
 
@@ -114,13 +118,29 @@ class Analyzer:
         all_days = [_.format('YYYY-MM-DD') for _ in day_range]
         return all_days
 
+    all_weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
     def per_day(self):
         print('Analyzing messages by day...')
         per_day = self.df.groupby('day').count()['sender']
+        per_weekday = self.df.groupby('weekday').count()['sender']
         # Fill missing days
         per_day = per_day.reindex(self.all_days_range)
         per_day.fillna(0, inplace=True)
-        # Plot
+        per_weekday = per_weekday.reindex(self.all_weekdays)
+        per_weekday.fillna(0, inplace=True)
+        # Plot weekdays
+        the_one_plot = per_weekday.plot(
+            title='Messages per weekday',
+            kind='bar',
+            fontsize=18,
+            xlabel='Day',
+            ylabel='Messages',
+            figsize=(20,15),
+        )
+        plt.savefig(self.output_folder / 'per-weekday.png')
+        the_one_plot.clear()
+        # Plot dates
         the_one_plot = per_day.plot(
             title='Messages per day',
             kind='bar',
@@ -182,7 +202,7 @@ class Analyzer:
     def unique_messages(self):
         message_counts = self.df.groupby('message').count()['sender']
         message_counts = message_counts.sort_values(ascending=False)
-        message_counts = message_counts[message_counts > 3]
+        message_counts = message_counts[message_counts > 1]
         print(f'Analyzing unique messages...')
         mc_strs = []
         for idx, count in message_counts.iteritems():
