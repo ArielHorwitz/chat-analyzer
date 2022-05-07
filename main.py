@@ -2,7 +2,7 @@ from pathlib import Path
 import random
 import arrow
 import pandas as pd
-from matplotlib import pyplot as plt
+from plotly import express as px
 import util
 
 
@@ -113,6 +113,7 @@ class Importer:
         print(chat_df)
         return chat_df
 
+MEDIA_MESSAGE = '<Media omitted>'
 
 class Analyzer:
     def __init__(self, df, output_folder=None):
@@ -132,11 +133,15 @@ class Analyzer:
         print(f'Analyzing...')
         print(self.df)
         self.all_days_range = self._all_days_range()
-        self.per_day()
-        self.per_hour()
-        self.per_sender()
-        self.per_sender_media()
-        self.unique_messages()
+        figures = {
+            **self.per_day(),
+            **self.per_hour(),
+            **self.per_sender(),
+            **self.per_sender_media(),
+            **self.unique_messages(),
+        }
+        for name, data in figures.items():
+            data.write_html(self.output_folder / f'{name}.html')
         print(f'Output data to: {self.output_folder}')
         if show_dir:
             util.open_file_explorer(self.output_folder)
@@ -150,95 +155,70 @@ class Analyzer:
         return all_days
 
     all_weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    all_hours = [f'{_:0>2}' for _ in range(24)]
 
     def per_day(self):
         print('Analyzing messages by day...')
-        per_day = self.df.groupby('day').count()['sender']
-        per_weekday = self.df.groupby('weekday').count()['sender']
-        # Fill missing days
-        per_day = per_day.reindex(self.all_days_range)
+        # Dates
+        per_day = self.df.groupby(['day', 'sender']).size().unstack(level=0)
+        missing_days = set(self.all_days_range) - set(per_day.columns)
+        per_day[list(missing_days)] = None
+        per_day = per_day[self.all_days_range]
         per_day.fillna(0, inplace=True)
-        per_weekday = per_weekday.reindex(self.all_weekdays)
+        per_day = per_day.T
+        # Weekdays
+        per_weekday = self.df.groupby(['weekday', 'sender']).size().unstack(level=0)
+        missing_weekdays = set(self.all_weekdays) - set(per_weekday.columns)
+        per_weekday[list(missing_weekdays)] = None
+        per_weekday = per_weekday[self.all_weekdays]
         per_weekday.fillna(0, inplace=True)
-        # Plot weekdays
-        the_one_plot = per_weekday.plot(
-            title='Messages per weekday',
-            kind='bar',
-            fontsize=18,
-            xlabel='Day',
-            ylabel='Messages',
-            figsize=(20,15),
-        )
-        plt.savefig(self.output_folder / 'per-weekday.png')
-        the_one_plot.clear()
-        # Plot dates
-        the_one_plot = per_day.plot(
-            title='Messages per day',
-            kind='bar',
-            fontsize=18,
-            xlabel='Day',
-            ylabel='Messages',
-            figsize=(20,15),
-        )
-        plt.savefig(self.output_folder / 'per-day.png')
-        the_one_plot.clear()
+        per_weekday = per_weekday.T
+        day_labels = {'day': 'Date', 'sender': 'Sender', 'value': 'Messages'}
+        weekday_labels = {'weekday': 'Day', 'sender': 'Sender', 'value': 'Messages'}
+        return {
+            'msg-per-day-stacked': px.bar(per_day, title='Messages per day (stacked)', labels=day_labels),
+            'msg-per-day': px.bar(per_day, barmode='group', title='Messages per day', labels=day_labels),
+            'msg-per-weekday-stacked': px.bar(per_weekday, title='Messages per weekday (stacked)', labels=weekday_labels),
+            'msg-per-weekday': px.bar(per_weekday, barmode='group', title='Messages per weekday', labels=weekday_labels),
+        }
 
     def per_hour(self):
         print('Analyzing messages by hour...')
-        day_count = len(self.all_days_range)
-        per_hour_total = self.df.groupby('hour').count()['date']
-        per_hour = per_hour_total / day_count
-        # Fill missing hours
-        per_hour = per_hour.reindex([f'{_:0>2}' for _ in range(24)])
+        per_hour = self.df.groupby(['hour', 'sender']).size().unstack(level=0)
+        missing_hours = set(self.all_hours) - set(per_hour.columns)
+        per_hour[list(missing_hours)] = None
+        per_hour = per_hour[self.all_hours]
         per_hour.fillna(0, inplace=True)
-        # Plot
-        the_one_plot = per_hour.plot(
-            title='Average messages per hour',
-            kind='bar',
-            fontsize=18,
-            xlabel='Hour',
-            ylabel='Average messages',
-            figsize=(20,15),
-        )
-        plt.savefig(self.output_folder / 'per-hour.png')
-        the_one_plot.clear()
+        per_hour = per_hour.T
+        per_hour /= len(self.all_days_range)
+        labels = {'hour': 'Hour', 'sender': 'Sender', 'value': 'Messages'}
+        return {
+            'msg-per-hour-stacked': px.bar(per_hour, title='Messages per hour (stacked)', labels=labels),
+            'msg-per-hour': px.bar(per_hour, barmode='group', title='Messages per hour', labels=labels),
+        }
 
     def per_sender(self):
         print('Analyzing senders...')
-        msg_per_sender = self.df.groupby('sender').count()['message']
-        # Plot
-        the_one_plot = msg_per_sender.plot(
-            title='Messages by sender',
-            kind='pie',
-            fontsize=18,
-            figsize=(20,15),
-        )
-        plt.savefig(self.output_folder / 'per-sender.png')
-        the_one_plot.clear()
+        msg_per_sender = self.df.groupby('sender').size().to_frame(name='Messages')
+        labels = {'sender': 'Sender'}
+        return {'msg-per-sender': px.pie(msg_per_sender, title='Messages per person', names=msg_per_sender.index, values='Messages', labels=labels)}
 
     def per_sender_media(self):
         print('Analyzing media messages...')
-        medias = self.df[self.df['message'] == '<Media omitted>']
-        media_per_sender = medias.groupby('sender').count()['message']
-        # Plot
-        the_one_plot = media_per_sender.plot(
-            title='Media messages by sender',
-            kind='pie',
-            fontsize=18,
-            figsize=(20,15),
-        )
-        plt.savefig(self.output_folder / 'per-sender-media.png')
-        the_one_plot.clear()
+        medias = self.df[self.df['message'] == MEDIA_MESSAGE]
+        media_per_sender = medias.groupby('sender').size().to_frame(name='Messages')
+        return {'msg-media-per-sender': px.pie(media_per_sender, names=media_per_sender.index, values='Messages', title='Media messages per person')}
 
     def unique_messages(self):
+        print(f'Analyzing unique messages...')
         message_counts = self.df.groupby('message').count()['sender']
         message_counts = message_counts.sort_values(ascending=False)
         message_counts = message_counts[message_counts > 1]
-        print(f'Analyzing unique messages...')
         mc_strs = []
         for idx, count in message_counts.iteritems():
             mc_strs.append(f'{count} - {idx}')
         util.file_dump(self.output_folder / 'unique_message_counts.txt', '\n'.join(mc_strs))
+        return {}
 
 
 def main():
