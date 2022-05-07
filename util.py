@@ -1,10 +1,12 @@
 import os, platform, subprocess
+import hashlib
 import random
 import arrow
 from argparse import ArgumentParser
 from pathlib import Path
 
 
+CRYPTO_NAMES = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank', 'Grace', 'Ivan', 'Judy', 'Mike', 'Niaj', 'Olivia', 'Peggy', 'Rupert', 'Sybil', 'Ted', 'Victor', 'Wendy']
 LOREM_IPSUM = """cursus nibh velit venenatis est habitasse lectus odio aliquet metus varius nec habitant quis sodales dictumst euismod imperdiet ultrices mollis senectus himenaeos cursus hendrerit non quisque platea egestas viverra nam diam eget inceptos duis magna vulputate suspendisse neque pulvinar tempus sagittis aliquet libero blandit vivamus est pellentesque egestas laoreet auctor porta arcu consequat nullam"""
 LOREM_IPSUM_WORDS = list(LOREM_IPSUM.split(' '))
 
@@ -23,6 +25,9 @@ def parse_args():
         '-l', dest='line_limit',
         type=int, default=0,
         help='Maximum number of lines to import from file')
+    parser.add_argument(
+        '--no-anon', dest='anonymize', action='store_false',
+        help='Disable sender anonymization')
     parser.add_argument(
         '-o', dest='output',
         type=Path, default=None,
@@ -71,3 +76,7 @@ def generate_random_date(week_range=3, day_range=7, hour_range=24):
     t = t.shift(days=random.randint(-day_range-1, 0))
     t = t.shift(hours=random.randint(-hour_range-1, 0))
     return t
+
+
+def h256(input_str):
+    return hashlib.sha256(input_str.encode()).hexdigest()

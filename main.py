@@ -1,4 +1,5 @@
 from pathlib import Path
+import copy
 import random
 import arrow
 import pandas as pd
@@ -14,8 +15,13 @@ class Importer:
             output_folder=None,
             mode='randomgen',
             line_limit=None,
+            anonymize_senders=True,
         ):
         self.output_folder = self.resolve_output(output_folder)
+        self.__salt = str(random.random())[-4:]
+        self.__crypto_names = copy.copy(util.CRYPTO_NAMES)
+        random.shuffle(self.__crypto_names)
+        self.__sender_map = {}
 
         import_methods = {
             'whatsapp': self.import_chat_whatsapp,
@@ -33,6 +39,17 @@ class Importer:
             self.cache_dataframe(self.df)
         else:
             raise ValueError(f'No such mode: {mode}')
+        if anonymize_senders:
+            self.df['sender'] = [self._anonymize_sender(_) for _ in self.df['sender']]
+
+    def _anonymize_sender(self, name):
+        if name in self.__sender_map:
+            return self.__sender_map[name]
+        if self.__crypto_names:
+            self.__sender_map[name] = self.__crypto_names.pop(0)
+        else:
+            self.__sender_map[name] = util.h256(f'{name}{self.__salt}')[:6]
+        return self.__sender_map[name]
 
     @staticmethod
     def resolve_output(dir_path):
@@ -219,7 +236,10 @@ class Analyzer:
 
 def main():
     arg_space = util.parse_args()
-    df = Importer(arg_space.file, mode=arg_space.mode, line_limit=arg_space.line_limit).df
+    df = Importer(arg_space.file,
+        mode=arg_space.mode, line_limit=arg_space.line_limit,
+        anonymize_senders=arg_space.anonymize,
+        ).df
     Analyzer(df, arg_space.output).analyze(show_dir=arg_space.show_output)
 
 
