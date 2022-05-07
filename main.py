@@ -131,7 +131,8 @@ class Analyzer:
 
     def analyze(self, show_dir=True):
         print(f'Analyzing...')
-        print(self.df)
+        print(self.df.head(25))
+        print(self.df.tail(25))
         self.all_days_range = self._all_days_range()
         figures = {
             **self.per_day(),
@@ -161,16 +162,12 @@ class Analyzer:
         print('Analyzing messages by day...')
         # Dates
         per_day = self.df.groupby(['day', 'sender']).size().unstack(level=0)
-        missing_days = set(self.all_days_range) - set(per_day.columns)
-        per_day[list(missing_days)] = None
-        per_day = per_day[self.all_days_range]
+        per_day = per_day.reindex(columns=self.all_days_range)
         per_day.fillna(0, inplace=True)
         per_day = per_day.T
         # Weekdays
         per_weekday = self.df.groupby(['weekday', 'sender']).size().unstack(level=0)
-        missing_weekdays = set(self.all_weekdays) - set(per_weekday.columns)
-        per_weekday[list(missing_weekdays)] = None
-        per_weekday = per_weekday[self.all_weekdays]
+        per_weekday = per_weekday.reindex(columns=self.all_weekdays)
         per_weekday.fillna(0, inplace=True)
         per_weekday = per_weekday.T
         day_labels = {'day': 'Date', 'sender': 'Sender', 'value': 'Messages'}
@@ -185,9 +182,8 @@ class Analyzer:
     def per_hour(self):
         print('Analyzing messages by hour...')
         per_hour = self.df.groupby(['hour', 'sender']).size().unstack(level=0)
-        missing_hours = set(self.all_hours) - set(per_hour.columns)
-        per_hour[list(missing_hours)] = None
-        per_hour = per_hour[self.all_hours]
+        per_hour.rename(columns=lambda x: f'{x:0>2}', inplace=True)
+        per_hour = per_hour.reindex(columns=self.all_hours)
         per_hour.fillna(0, inplace=True)
         per_hour = per_hour.T
         per_hour /= len(self.all_days_range)
