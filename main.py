@@ -58,8 +58,8 @@ class Importer:
         print(f'Cached chat at: {output}')
 
     @staticmethod
-    def import_chat_whatsapp(target_file, line_limit=None):
-        line_limit = 10**9 if line_limit is None else line_limit
+    def import_chat_whatsapp(target_file, line_limit=0):
+        line_limit = 10**9 if line_limit == 0 else line_limit
         print(f'Processing whatsapp chat: {target_file} (max: {line_limit} lines)')
         chat_content = util.file_load(target_file)
         chat_lines = chat_content.split('\n')
@@ -91,8 +91,8 @@ class Importer:
         return chat_df
 
     @staticmethod
-    def import_chat_random(line_limit=None, senders=None):
-        line_limit = 2_000 if line_limit is None else line_limit
+    def import_chat_random(line_limit=0, senders=None):
+        line_limit = 2_000 if line_limit == 0 else line_limit
         print(f'Creating random chat history with {line_limit} messages')
         chat_df = pd.DataFrame(columns=['date', 'sender', 'message', 'day', 'weekday', 'hour'])
         if senders is None:
@@ -128,7 +128,7 @@ class Analyzer:
             output_folder.mkdir(parents=True)
         return output_folder
 
-    def analyze(self):
+    def analyze(self, show_dir=True):
         print(f'Analyzing...')
         print(self.df)
         self.all_days_range = self._all_days_range()
@@ -138,6 +138,8 @@ class Analyzer:
         self.per_sender_media()
         self.unique_messages()
         print(f'Output data to: {self.output_folder}')
+        if show_dir:
+            util.open_file_explorer(self.output_folder)
 
     def _all_days_range(self):
         raw_days = sorted(self.df.groupby('day').count().index)
@@ -242,7 +244,7 @@ class Analyzer:
 def main():
     arg_space = util.parse_args()
     df = Importer(arg_space.file, mode=arg_space.mode, line_limit=arg_space.line_limit).df
-    Analyzer(df, arg_space.output).analyze()
+    Analyzer(df, arg_space.output).analyze(show_dir=arg_space.show_output)
 
 
 if __name__ == '__main__':
