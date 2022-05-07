@@ -29,6 +29,9 @@ def parse_args():
         '--no-anon', dest='anonymize', action='store_false',
         help='Disable sender anonymization')
     parser.add_argument(
+        '--cache', dest='cache_data', action='store_true',
+        help='Cache imported data')
+    parser.add_argument(
         '-o', dest='output',
         type=Path, default=None,
         help='Directory to save analyzed data')
@@ -39,6 +42,15 @@ def parse_args():
     args = parser.parse_args()
     print(f'Parsed args: {args}')
     return args
+
+
+def resolve_output(output_path):
+    if output_path is None or output_path == '':
+        output_path = Path.cwd() / 'output'
+    output_path = Path(output_path)
+    if not output_path.is_dir():
+        output_path.mkdir(parents=True)
+    return output_path
 
 
 def file_dump(file, d, clear=True):

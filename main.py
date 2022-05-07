@@ -11,22 +11,17 @@ class Importer:
     CACHED_DF_NAME = 'cached_df.json'
 
     def __init__(self,
-            import_file=None,
-            output_folder=None,
-            mode='randomgen',
-            line_limit=None,
-            anonymize_senders=True,
+            import_file=None, output_folder=None,
+            mode='randomgen', line_limit=None, anonymize_senders=True,
+            cache_data=False,
         ):
-        self.output_folder = self.resolve_output(output_folder)
+        self.output_folder = output_folder
         self.__salt = str(random.random())[-4:]
         self.__crypto_names = copy.copy(util.CRYPTO_NAMES)
         random.shuffle(self.__crypto_names)
         self.__sender_map = {}
-
-        import_methods = {
-            'whatsapp': self.import_chat_whatsapp,
-        }
-
+        # Get data
+        import_methods = {'whatsapp': self.import_chat_whatsapp}
         if mode == 'randomgen':
             print(f'Generating random data...')
             self.df = self.import_chat_random(line_limit=line_limit)
@@ -36,11 +31,14 @@ class Importer:
         elif mode in import_methods:
             print(f'Importing data from file...')
             self.df = import_methods[mode](Path(import_file), line_limit=line_limit)
-            self.cache_dataframe(self.df)
         else:
             raise ValueError(f'No such mode: {mode}')
+        # Process data
         if anonymize_senders:
             self.df['sender'] = [self._anonymize_sender(_) for _ in self.df['sender']]
+        # Post-import
+        if cache_data:
+            self.cache_dataframe(self.df)
 
     def _anonymize_sender(self, name):
         if name in self.__sender_map:
@@ -50,16 +48,6 @@ class Importer:
         else:
             self.__sender_map[name] = util.h256(f'{name}{self.__salt}')[:6]
         return self.__sender_map[name]
-
-    @staticmethod
-    def resolve_output(dir_path):
-        if dir_path is None:
-            dir_path = Path.cwd() / 'output'
-        else:
-            dir_path = Path(dir_path)
-        if not dir_path.is_dir():
-            dir_path.mkdir(parents=True)
-        return dir_path
 
     @classmethod
     def import_cached_dataframe(cls, cache_dir):
@@ -135,16 +123,7 @@ MEDIA_MESSAGE = '<Media omitted>'
 class Analyzer:
     def __init__(self, df, output_folder=None):
         self.df = df
-        self.output_folder = self.resolve_output_folder(output_folder)
-
-    @staticmethod
-    def resolve_output_folder(output_folder):
-        if output_folder is None:
-            output_folder = Path.cwd() / 'output'
-        output_folder = Path(output_folder)
-        if not output_folder.is_dir():
-            output_folder.mkdir(parents=True)
-        return output_folder
+        self.output_folder = output_folder
 
     def analyze(self, show_dir=True):
         print(f'Analyzing...')
@@ -236,11 +215,13 @@ class Analyzer:
 
 def main():
     arg_space = util.parse_args()
-    df = Importer(arg_space.file,
+    output_dir = util.resolve_output(arg_space.output)
+    df = Importer(
+        import_file=arg_space.file, output_folder=output_dir,
         mode=arg_space.mode, line_limit=arg_space.line_limit,
-        anonymize_senders=arg_space.anonymize,
+        anonymize_senders=arg_space.anonymize, cache_data=arg_space.cache_data,
         ).df
-    Analyzer(df, arg_space.output).analyze(show_dir=arg_space.show_output)
+    Analyzer(df, output_folder=output_dir).analyze(show_dir=arg_space.show_output)
 
 
 if __name__ == '__main__':
