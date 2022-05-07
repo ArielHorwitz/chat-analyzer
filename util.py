@@ -32,6 +32,10 @@ def parse_args():
         '--cache', dest='cache_data', action='store_true',
         help='Cache imported data')
     parser.add_argument(
+        '--font', dest='font_path',
+        type=Path, default=None,
+        help='Path to font to use for output')
+    parser.add_argument(
         '-o', dest='output',
         type=Path, default=None,
         help='Directory to save analyzed data')

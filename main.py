@@ -2,12 +2,22 @@ from pathlib import Path
 import copy
 import random
 import arrow
+from collections import Counter
 import pandas as pd
 from plotly import express as px
+from wordcloud import WordCloud
+import spacy
 import util
 
 
+try:
+    print(f'Loading language data...')
+    NLP = spacy.load('en_core_web_sm')
+except OSError:
+    raise RuntimeError(f'Missing data to download. Please run the following command from within your venv: "python -m spacy download en_core_web_sm"')
+
 DATE_FORMAT = 'YYYY-MM-DD HH:mm:ss'
+MEDIA_MESSAGE = '<Media omitted>'
 
 
 class Importer:
@@ -123,12 +133,12 @@ class Importer:
         print(f'Generated random chat.')
         return chat_df
 
-MEDIA_MESSAGE = '<Media omitted>'
 
 class Analyzer:
-    def __init__(self, df, output_folder=None):
+    def __init__(self, df, output_folder, font_path=None):
         self.df = df
         self.output_folder = output_folder
+        self.font_path = None if font_path is None else Path(font_path)
 
     def analyze(self, show_dir=True):
         print(f'Analyzing...')
@@ -139,6 +149,8 @@ class Analyzer:
             **self.per_sender(),
             **self.per_sender_media(),
             **self.unique_messages(),
+            **self.full_wordcloud(),
+            **self.per_sender_wordclouds(),
         }
         for name, data in figures.items():
             data.write_html(self.output_folder / f'{name}.html')
@@ -215,6 +227,41 @@ class Analyzer:
         util.file_dump(self.output_folder / 'unique_message_counts.txt', '\n'.join(mc_strs))
         return {}
 
+    def full_wordcloud(self):
+        all_text = ' '.join(self.df['message'])
+        print(f'Generating wordcloud ({len(all_text):,} chars)...')
+        self.generate_wordcloud(all_text, name='all')
+        return {}
+
+    def per_sender_wordclouds(self):
+        max_senders = 5
+        print(f'Analyzing message contents of top {max_senders} senders...')
+        msg_per_sender = self.df.groupby('sender').size().sort_values(ascending=False)
+        print(msg_per_sender)
+        for sender_name in msg_per_sender.index[:max_senders]:
+            all_msgs = self.df[self.df['sender'] == sender_name]['message']
+            all_text = ' '.join(all_msgs)
+            print(f'Generating wordcloud for {sender_name} ({len(all_text):,} chars)...')
+            self.generate_wordcloud(all_text, name=sender_name.lower())
+        return {}
+
+    def generate_wordcloud(self, text, name):
+        # Tokenize
+        doc = NLP(text)
+        words = [token.text.lower() for token in doc]
+        unique_words = set(words)
+        word_counts = Counter(words)
+        # Wordcloud
+        wc_kwargs = {
+            'width': 1200,
+            'height': 800,
+            'max_words': 500,
+        }
+        if self.font_path is not None and self.font_path.is_file():
+            wc_kwargs |= {'font_path': str(self.font_path)}
+        wc = WordCloud(**wc_kwargs).generate_from_frequencies(word_counts)
+        wc.to_file(self.output_folder / f'wordcloud-{name}.png')
+
 
 def main():
     arg_space = util.parse_args()
@@ -224,7 +271,8 @@ def main():
         mode=arg_space.mode, line_limit=arg_space.line_limit,
         anonymize_senders=arg_space.anonymize, cache_data=arg_space.cache_data,
         ).df
-    Analyzer(df, output_folder=output_dir).analyze(show_dir=arg_space.show_output)
+    a = Analyzer(df, output_folder=output_dir, font_path=arg_space.font_path)
+    a.analyze(show_dir=arg_space.show_output)
 
 
 if __name__ == '__main__':
