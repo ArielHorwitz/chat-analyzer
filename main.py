@@ -1,8 +1,9 @@
 from pathlib import Path
+import random
 import arrow
 import pandas as pd
 from matplotlib import pyplot as plt
-from util import parse_args, file_load, file_dump
+import util
 
 
 class Importer:
@@ -11,22 +12,27 @@ class Importer:
     def __init__(self,
             import_file=None,
             output_folder=None,
-            mode='whatsapp',
+            mode='randomgen',
             line_limit=None,
         ):
         self.output_folder = self.resolve_output(output_folder)
 
-        import_method = {
+        import_methods = {
             'whatsapp': self.import_chat_whatsapp,
-        }[mode]
+        }
 
-        if import_file is None:
+        if mode == 'randomgen':
+            print(f'Generating random data...')
+            self.df = self.import_chat_random(line_limit=line_limit)
+        elif mode == 'cached':
             print(f'Using cached data...')
             self.df = self.import_cached_dataframe(self.output_folder)
-        else:
+        elif mode in import_methods:
             print(f'Importing data from file...')
-            self.df = import_method(Path(import_file), line_limit=line_limit)
+            self.df = import_methods[mode](Path(import_file), line_limit=line_limit)
             self.cache_dataframe(self.df)
+        else:
+            raise ValueError(f'No such mode: {mode}')
 
     @staticmethod
     def resolve_output(dir_path):
@@ -55,7 +61,7 @@ class Importer:
     def import_chat_whatsapp(target_file, line_limit=None):
         line_limit = 10**9 if line_limit is None else line_limit
         print(f'Processing whatsapp chat: {target_file} (max: {line_limit} lines)')
-        chat_content = file_load(target_file)
+        chat_content = util.file_load(target_file)
         chat_lines = chat_content.split('\n')
         chat_df = pd.DataFrame(columns=['date', 'sender', 'message'])
         print(f'Number of lines in chat: {len(chat_lines)}')
@@ -81,6 +87,29 @@ class Importer:
         chat_df['hour'] = chat_df['date'].apply(lambda x: arrow.get(x).format('HH'))
 
         print(f'Imported whatsapp chat.')
+        print(chat_df)
+        return chat_df
+
+    @staticmethod
+    def import_chat_random(line_limit=None, senders=None):
+        line_limit = 2_000 if line_limit is None else line_limit
+        print(f'Creating random chat history with {line_limit} messages')
+        chat_df = pd.DataFrame(columns=['date', 'sender', 'message', 'day', 'weekday', 'hour'])
+        if senders is None:
+            senders = ['Alice', 'Bob', 'Charlie', 'Dave', 'Eve']
+        # Generate messages
+        for i in range(line_limit):
+            message = util.generate_random_line()
+            sender = random.choice(senders)
+            date = util.generate_random_date()
+            day = date.format('YYYY-MM-DD')
+            weekday = date.format('dddd')
+            hour = date.format('HH')
+            if i % 1000 == 0:
+                print(f'Generating message #{i}: ({sender} @ {date}) {message}')
+            chat_df.loc[len(chat_df.index)] = [date, sender, message, day, weekday, hour]
+
+        print(f'Generated random chat.')
         print(chat_df)
         return chat_df
 
@@ -207,12 +236,12 @@ class Analyzer:
         mc_strs = []
         for idx, count in message_counts.iteritems():
             mc_strs.append(f'{count} - {idx}')
-        file_dump(self.output_folder / 'unique_message_counts.txt', '\n'.join(mc_strs))
+        util.file_dump(self.output_folder / 'unique_message_counts.txt', '\n'.join(mc_strs))
 
 
 def main():
-    arg_space = parse_args()
-    df = Importer(arg_space.file, line_limit=arg_space.line_limit).df
+    arg_space = util.parse_args()
+    df = Importer(arg_space.file, mode=arg_space.mode, line_limit=arg_space.line_limit).df
     Analyzer(df, arg_space.output).analyze()
 
 
