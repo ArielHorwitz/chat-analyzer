@@ -82,11 +82,12 @@ def generate_random_line(word_count=None):
     return line
 
 
-def generate_random_date(week_range=3, day_range=7, hour_range=24):
+def generate_random_date(week_range=3, day_range=7, hour_range=24, minute_range=60):
     t = arrow.now()
-    t = t.shift(weeks=random.randint(-week_range-1, 0))
-    t = t.shift(days=random.randint(-day_range-1, 0))
-    t = t.shift(hours=random.randint(-hour_range-1, 0))
+    t = t.shift(weeks=random.randint(-week_range, 0))
+    t = t.shift(days=random.randint(-day_range, 0))
+    t = t.shift(hours=random.randint(-hour_range, 0))
+    t = t.shift(minutes=random.randint(-minute_range, 0))
     return t
 
 

@@ -7,6 +7,9 @@ from plotly import express as px
 import util
 
 
+DATE_FORMAT = 'YYYY-MM-DD HH:mm:ss'
+
+
 class Importer:
     CACHED_DF_NAME = 'cached_df.json'
 
@@ -37,6 +40,9 @@ class Importer:
         if anonymize_senders:
             self.df['sender'] = [self._anonymize_sender(_) for _ in self.df['sender']]
         # Post-import
+        print(f'Import completed.')
+        with pd.option_context('display.min_rows', 30):
+            print(self.df)
         if cache_data:
             self.cache_dataframe(self.df)
 
@@ -77,7 +83,7 @@ class Importer:
             try:
                 date, line = line.split(' - ', 1)
                 sender, message = line.split(': ', 1)
-                date = arrow.get(date, 'M/D/YY, HH:mm').format('YYYY-MM-DD HH:MM:SS')
+                date = arrow.get(date, 'M/D/YY, HH:mm').format(DATE_FORMAT)
                 chat_df.loc[len(chat_df.index)] = [date, sender, message]
             except Exception:
                 if len(chat_df['date']) > 0:
@@ -92,7 +98,6 @@ class Importer:
         chat_df['hour'] = chat_df['date'].apply(lambda x: arrow.get(x).format('HH'))
 
         print(f'Imported whatsapp chat.')
-        print(chat_df)
         return chat_df
 
     @staticmethod
@@ -106,16 +111,16 @@ class Importer:
         for i in range(line_limit):
             message = util.generate_random_line()
             sender = random.choice(senders)
-            date = util.generate_random_date()
-            day = date.format('YYYY-MM-DD')
-            weekday = date.format('dddd')
-            hour = date.format('HH')
+            msg_date = util.generate_random_date()
+            date = msg_date.format(DATE_FORMAT)
+            day = msg_date.format('YYYY-MM-DD')
+            weekday = msg_date.format('dddd')
+            hour = msg_date.format('HH')
             if i % 1000 == 0:
                 print(f'Generating message #{i}: ({sender} @ {date}) {message}')
             chat_df.loc[len(chat_df.index)] = [date, sender, message, day, weekday, hour]
 
         print(f'Generated random chat.')
-        print(chat_df)
         return chat_df
 
 MEDIA_MESSAGE = '<Media omitted>'
@@ -127,8 +132,6 @@ class Analyzer:
 
     def analyze(self, show_dir=True):
         print(f'Analyzing...')
-        print(self.df.head(25))
-        print(self.df.tail(25))
         self.all_days_range = self._all_days_range()
         figures = {
             **self.per_day(),
