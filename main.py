@@ -12,7 +12,7 @@ import plotly_html
 
 
 DATE_FORMAT = 'YYYY-MM-DD HH:mm:ss'
-MEDIA_MESSAGE = '<Media omitted>'
+WHATSPP_MEDIA_MESSAGE = '<Media omitted>'
 
 
 class Importer:
@@ -101,6 +101,7 @@ class Importer:
         chat_df['weekday'] = chat_df['date'].apply(lambda x: arrow.get(x).format('dddd'))
         print(f'Post processing hours...')
         chat_df['hour'] = chat_df['date'].apply(lambda x: arrow.get(x).format('HH'))
+        chat_df['is_media'] = chat_df['message'] == WHATSPP_MEDIA_MESSAGE
 
         print(f'Imported whatsapp chat.')
         return chat_df
@@ -124,6 +125,7 @@ class Importer:
             if i % 1000 == 0:
                 print(f'Generating message #{i}: ({sender} @ {date}) {message}')
             chat_df.loc[len(chat_df.index)] = [date, sender, message, day, weekday, hour]
+        chat_df['is_media'] = False
 
         print(f'Generated random chat.')
         return chat_df
@@ -242,7 +244,7 @@ class Analyzer:
 
     def per_sender_media(self):
         print('Analyzing media messages...')
-        medias = self.df[self.df['message'] == MEDIA_MESSAGE]
+        medias = self.df[self.df['is_media']]
         media_per_sender = medias.groupby('sender').size().to_frame(name='Messages')
         fig = px.pie(media_per_sender, names=media_per_sender.index, values='Messages', title='Media messages per person')
         self.add_figure(fig, 'counts')
