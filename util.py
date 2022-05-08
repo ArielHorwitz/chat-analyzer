@@ -32,9 +32,9 @@ def parse_args():
         '--cache', dest='cache_data', action='store_true',
         help='Cache imported data')
     parser.add_argument(
-        '--font', dest='font_path',
-        type=Path, default=None,
-        help='Path to font to use for output')
+        '-a', dest='analyses',
+        type=str, default='', nargs='*',
+        help='Analyses, any combination of: all, time, counts, cloud')
     parser.add_argument(
         '-o', dest='output',
         type=Path, default=None,
@@ -45,6 +45,10 @@ def parse_args():
     parser.add_argument(
         '--force-clear', dest='force_clear', action='store_true',
         help='Like --clear but supresses prompts')
+    parser.add_argument(
+        '--font', dest='font_path',
+        type=Path, default=None,
+        help='Path to font to use for output')
     parser.add_argument(
         '-s', dest='show_output', action='store_true',
         help='Open the output folder')

@@ -139,21 +139,26 @@ class Analyzer:
         self.df = df
         self.output_folder = output_folder
         self.font_path = None if font_path is None else Path(font_path)
-
-    def analyze(self, show_dir=True):
-        print(f'Analyzing...')
         self.all_days_range = self._all_days_range()
-        figures = {
-            **self.per_day(),
-            **self.per_hour(),
-            **self.per_sender(),
-            **self.per_sender_media(),
-            **self.unique_messages(),
-            **self.full_wordcloud(),
-            **self.per_sender_wordclouds(),
+
+    @classmethod
+    def _get_analyses_map(cls):
+        return {
+            'time': [cls.per_day, cls.per_hour],
+            'counts': [cls.per_sender, cls.per_sender_media, cls.unique_messages],
+            'cloud': [cls.full_wordcloud, cls.per_sender_wordclouds],
         }
-        for name, data in figures.items():
-            data.write_html(self.output_folder / f'{name}.html')
+
+    def analyze(self, show_dir=True, analyses=None):
+        analyses_map = self._get_analyses_map()
+        if not analyses:  # is None or empty list
+            analyses = ['all']
+        if 'all' in analyses:
+            analyses = list(analyses_map.keys())
+        print(f'Analyzing: {", ".join(analyses)}')
+        for analysis_category in analyses:
+            for analysis in analyses_map[analysis_category]:
+                analysis(self)
         print(f'Output data to: {self.output_folder}')
         if show_dir:
             util.open_file_explorer(self.output_folder)
@@ -183,12 +188,15 @@ class Analyzer:
         per_weekday = per_weekday.T
         day_labels = {'day': 'Date', 'sender': 'Sender', 'value': 'Messages'}
         weekday_labels = {'weekday': 'Day', 'sender': 'Sender', 'value': 'Messages'}
-        return {
-            'msg-per-day-stacked': px.bar(per_day, title='Messages per day (stacked)', labels=day_labels),
-            'msg-per-day': px.bar(per_day, barmode='group', title='Messages per day', labels=day_labels),
-            'msg-per-weekday-stacked': px.bar(per_weekday, title='Messages per weekday (stacked)', labels=weekday_labels),
-            'msg-per-weekday': px.bar(per_weekday, barmode='group', title='Messages per weekday', labels=weekday_labels),
-        }
+        # Figures
+        fig = px.bar(per_day, title='Messages per day (stacked)', labels=day_labels)
+        fig.write_html(self.output_folder / f'msg-per-day-stacked.html')
+        fig = px.bar(per_day, barmode='group', title='Messages per day', labels=day_labels)
+        fig.write_html(self.output_folder / f'msg-per-day.html')
+        fig = px.bar(per_weekday, title='Messages per weekday (stacked)', labels=weekday_labels)
+        fig.write_html(self.output_folder / f'msg-per-weekday-stacked.html')
+        fig = px.bar(per_weekday, barmode='group', title='Messages per weekday', labels=weekday_labels)
+        fig.write_html(self.output_folder / f'msg-per-weekday.html')
 
     def per_hour(self):
         print('Analyzing messages by hour...')
@@ -199,22 +207,27 @@ class Analyzer:
         per_hour = per_hour.T
         per_hour /= len(self.all_days_range)
         labels = {'hour': 'Hour', 'sender': 'Sender', 'value': 'Messages'}
-        return {
-            'msg-per-hour-stacked': px.bar(per_hour, title='Messages per hour (stacked)', labels=labels),
-            'msg-per-hour': px.bar(per_hour, barmode='group', title='Messages per hour', labels=labels),
-        }
+        # Figures
+        fig = px.bar(per_hour, title='Messages per hour (stacked)', labels=labels)
+        fig.write_html(self.output_folder / f'msg-per-hour-stacked.html')
+        fig = px.bar(per_hour, barmode='group', title='Messages per hour', labels=labels)
+        fig.write_html(self.output_folder / f'msg-per-hour.html')
 
     def per_sender(self):
         print('Analyzing senders...')
         msg_per_sender = self.df.groupby('sender').size().to_frame(name='Messages')
         labels = {'sender': 'Sender'}
-        return {'msg-per-sender': px.pie(msg_per_sender, title='Messages per person', names=msg_per_sender.index, values='Messages', labels=labels)}
+        fig = px.pie(
+            msg_per_sender, title='Messages per person',
+            names=msg_per_sender.index, values='Messages', labels=labels)
+        fig.write_html(self.output_folder / f'msg-per-sender.html')
 
     def per_sender_media(self):
         print('Analyzing media messages...')
         medias = self.df[self.df['message'] == MEDIA_MESSAGE]
         media_per_sender = medias.groupby('sender').size().to_frame(name='Messages')
-        return {'msg-media-per-sender': px.pie(media_per_sender, names=media_per_sender.index, values='Messages', title='Media messages per person')}
+        fig = px.pie(media_per_sender, names=media_per_sender.index, values='Messages', title='Media messages per person')
+        fig.write_html(self.output_folder / f'msg-media-per-sender.html')
 
     def unique_messages(self):
         print(f'Analyzing unique messages...')
@@ -225,13 +238,11 @@ class Analyzer:
         for idx, count in message_counts.iteritems():
             mc_strs.append(f'{count} - {idx}')
         util.file_dump(self.output_folder / 'unique_message_counts.txt', '\n'.join(mc_strs))
-        return {}
 
     def full_wordcloud(self):
         all_text = ' '.join(self.df['message'])
         print(f'Generating wordcloud ({len(all_text):,} chars)...')
         self.generate_wordcloud(all_text, name='all')
-        return {}
 
     def per_sender_wordclouds(self):
         max_senders = 5
@@ -243,7 +254,6 @@ class Analyzer:
             all_text = ' '.join(all_msgs)
             print(f'Generating wordcloud for {sender_name} ({len(all_text):,} chars)...')
             self.generate_wordcloud(all_text, name=sender_name.lower())
-        return {}
 
     def generate_wordcloud(self, text, name):
         # Tokenize
@@ -275,7 +285,7 @@ def main():
         anonymize_senders=arg_space.anonymize, cache_data=arg_space.cache_data,
         ).df
     a = Analyzer(df, output_folder=output_dir, font_path=arg_space.font_path)
-    a.analyze(show_dir=arg_space.show_output)
+    a.analyze(show_dir=arg_space.show_output, analyses=arg_space.analyses)
 
 
 if __name__ == '__main__':
