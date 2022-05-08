@@ -265,7 +265,10 @@ class Analyzer:
 
 def main():
     arg_space = util.parse_args()
-    output_dir = util.resolve_output(arg_space.output)
+    output_dir = util.resolve_output(arg_space.output,
+        clear=arg_space.clear, force_clear=arg_space.force_clear,
+        ignore=[Importer.CACHED_DF_NAME],
+        )
     df = Importer(
         import_file=arg_space.file, output_folder=output_dir,
         mode=arg_space.mode, line_limit=arg_space.line_limit,

@@ -40,6 +40,12 @@ def parse_args():
         type=Path, default=None,
         help='Directory to save analyzed data')
     parser.add_argument(
+        '--clear', dest='clear', action='store_true',
+        help='Clear the output directory before analysis')
+    parser.add_argument(
+        '--force-clear', dest='force_clear', action='store_true',
+        help='Like --clear but supresses prompts')
+    parser.add_argument(
         '-s', dest='show_output', action='store_true',
         help='Open the output folder')
 
@@ -48,12 +54,30 @@ def parse_args():
     return args
 
 
-def resolve_output(output_path):
+def resolve_output(output_path, clear=False, force_clear=False, ignore=None):
     if output_path is None or output_path == '':
         output_path = Path.cwd() / 'output'
+    if ignore is None:
+        ignore = []
     output_path = Path(output_path)
     if not output_path.is_dir():
         output_path.mkdir(parents=True)
+    if clear or force_clear:
+        print(f'Clearing output folder: {output_path}')
+        children = sorted(list(output_path.iterdir()), key=lambda x: str(x))
+        for child in children:
+            for ignored in ignore:
+                if ignored in str(child):
+                    break
+            else:
+                confirm = True
+                if not force_clear:
+                    confirm_input = input(f'Delete {child.name}? (y/n) ')
+                    confirm = confirm_input.lower() == 'y'
+                if not confirm:
+                    continue
+                print(f'Deleting {child.name} ...')
+                child.unlink()
     return output_path
 
 
