@@ -137,6 +137,7 @@ class Analyzer:
         ):
         self.figures = defaultdict(list)
         self.df = df
+        self.df_nomedia = self.df[~self.df.is_media]
         self.output_folder = output_folder
         self.font_path = None if font_path is None else Path(font_path)
         self.all_days_range = self._all_days_range()
@@ -238,7 +239,7 @@ class Analyzer:
         msg_per_sender = self.df.groupby('sender').size().to_frame(name='Messages')
         labels = {'sender': 'Sender'}
         fig = px.pie(
-            msg_per_sender, title='Messages per person',
+            msg_per_sender, title='Total messages per person',
             names=msg_per_sender.index, values='Messages', labels=labels)
         self.add_figure(fig, 'counts')
 
@@ -251,7 +252,7 @@ class Analyzer:
 
     def common_messages(self):
         print(f'Analyzing common messages...')
-        message_counts = self.df.groupby('message').count()['sender']
+        message_counts = self.df_nomedia.groupby('message').count()['sender']
         message_counts = message_counts.sort_values(ascending=False)
         message_counts = message_counts[message_counts > 1]
         mc_strs = []
@@ -260,17 +261,17 @@ class Analyzer:
         util.file_dump(self.output_folder / 'common_messages.txt', '\n'.join(mc_strs))
 
     def full_wordcloud(self):
-        all_text = ' '.join(self.df['message'])
+        all_text = ' '.join(self.df_nomedia['message'])
         print(f'Generating wordcloud ({len(all_text):,} chars)...')
         self.generate_wordcloud(all_text, name='all')
 
     def per_sender_wordclouds(self):
         max_senders = 5
         print(f'Analyzing message contents of top {max_senders} senders...')
-        msg_per_sender = self.df.groupby('sender').size().sort_values(ascending=False)
+        msg_per_sender = self.df_nomedia.groupby('sender').size().sort_values(ascending=False)
         print(msg_per_sender)
         for sender_name in msg_per_sender.index[:max_senders]:
-            all_msgs = self.df[self.df['sender'] == sender_name]['message']
+            all_msgs = self.df_nomedia[self.df_nomedia['sender'] == sender_name]['message']
             all_text = ' '.join(all_msgs)
             print(f'Generating wordcloud for {sender_name} ({len(all_text):,} chars)...')
             self.generate_wordcloud(all_text, name=sender_name.lower())
