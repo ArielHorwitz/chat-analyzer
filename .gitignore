@@ -1,4 +1,11 @@
+
+# Environment
 venv/
-output/
 dist/
 __pycache__
+
+# Data
+output/
+
+# Misc
+dev/
