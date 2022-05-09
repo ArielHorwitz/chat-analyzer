@@ -362,7 +362,7 @@ def main():
         ).df
     a = Analyzer(df,
         output_folder=output_dir, font_path=arg_space.font_path,
-        lang_code=arg_space.lang_code, strong_pos_filter=True,
+        lang_code=arg_space.lang_code, strong_pos_filter=arg_space.strong_filter,
     )
     a.analyze(analyses=arg_space.analyses)
     a.export_figures()

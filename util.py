@@ -40,6 +40,10 @@ def parse_args():
         type=str, default='en',
         help='Analysis language code, e.g. en, nl, zh, etc. See: https://spacy.io/usage/models/#languages')
     parser.add_argument(
+        '--soft-filter', dest='strong_filter', action='store_false',
+        default=True,
+        help='Apply a softer filter for wordcloud words')
+    parser.add_argument(
         '-o', dest='output',
         type=Path, default=None,
         help='Directory to save analyzed data')
