@@ -2,12 +2,13 @@ from pathlib import Path
 import copy
 import random
 import arrow
-from collections import Counter
+from collections import Counter, defaultdict
 import pandas as pd
 from plotly import express as px
 from wordcloud import WordCloud
 import spacy
 import util
+import plotly_html
 
 
 try:
@@ -136,10 +137,14 @@ class Importer:
 
 class Analyzer:
     def __init__(self, df, output_folder, font_path=None):
+        self.figures = defaultdict(list)
         self.df = df
         self.output_folder = output_folder
         self.font_path = None if font_path is None else Path(font_path)
         self.all_days_range = self._all_days_range()
+
+    def add_figure(self, fig, category):
+        self.figures[category].append(fig)
 
     @classmethod
     def _get_analyses_map(cls):
@@ -162,6 +167,12 @@ class Analyzer:
         print(f'Output data to: {self.output_folder}')
         if show_dir:
             util.open_file_explorer(self.output_folder)
+
+    def export_figures(self):
+        plotly_html.write_css(self.output_folder)
+        for category, figs in self.figures.items():
+            file = self.output_folder / f'{category}.html'
+            plotly_html.write_html(figs, file, title=category.capitalize())
 
     def _all_days_range(self):
         raw_days = sorted(self.df.groupby('day').count().index)
@@ -190,13 +201,13 @@ class Analyzer:
         weekday_labels = {'weekday': 'Day', 'sender': 'Sender', 'value': 'Messages'}
         # Figures
         fig = px.bar(per_day, title='Messages per day (stacked)', labels=day_labels)
-        fig.write_html(self.output_folder / f'msg-per-day-stacked.html')
+        self.add_figure(fig, 'time')
         fig = px.bar(per_day, barmode='group', title='Messages per day', labels=day_labels)
-        fig.write_html(self.output_folder / f'msg-per-day.html')
+        self.add_figure(fig, 'time')
         fig = px.bar(per_weekday, title='Messages per weekday (stacked)', labels=weekday_labels)
-        fig.write_html(self.output_folder / f'msg-per-weekday-stacked.html')
+        self.add_figure(fig, 'time')
         fig = px.bar(per_weekday, barmode='group', title='Messages per weekday', labels=weekday_labels)
-        fig.write_html(self.output_folder / f'msg-per-weekday.html')
+        self.add_figure(fig, 'time')
 
     def per_hour(self):
         print('Analyzing messages by hour...')
@@ -209,9 +220,9 @@ class Analyzer:
         labels = {'hour': 'Hour', 'sender': 'Sender', 'value': 'Messages'}
         # Figures
         fig = px.bar(per_hour, title='Messages per hour (stacked)', labels=labels)
-        fig.write_html(self.output_folder / f'msg-per-hour-stacked.html')
+        self.add_figure(fig, 'time')
         fig = px.bar(per_hour, barmode='group', title='Messages per hour', labels=labels)
-        fig.write_html(self.output_folder / f'msg-per-hour.html')
+        self.add_figure(fig, 'time')
 
     def per_sender(self):
         print('Analyzing senders...')
@@ -220,14 +231,14 @@ class Analyzer:
         fig = px.pie(
             msg_per_sender, title='Messages per person',
             names=msg_per_sender.index, values='Messages', labels=labels)
-        fig.write_html(self.output_folder / f'msg-per-sender.html')
+        self.add_figure(fig, 'counts')
 
     def per_sender_media(self):
         print('Analyzing media messages...')
         medias = self.df[self.df['message'] == MEDIA_MESSAGE]
         media_per_sender = medias.groupby('sender').size().to_frame(name='Messages')
         fig = px.pie(media_per_sender, names=media_per_sender.index, values='Messages', title='Media messages per person')
-        fig.write_html(self.output_folder / f'msg-media-per-sender.html')
+        self.add_figure(fig, 'counts')
 
     def unique_messages(self):
         print(f'Analyzing unique messages...')
@@ -286,6 +297,7 @@ def main():
         ).df
     a = Analyzer(df, output_folder=output_dir, font_path=arg_space.font_path)
     a.analyze(show_dir=arg_space.show_output, analyses=arg_space.analyses)
+    a.export_figures()
 
 
 if __name__ == '__main__':
