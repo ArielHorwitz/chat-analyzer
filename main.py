@@ -149,7 +149,7 @@ class Analyzer:
     @classmethod
     def _get_analyses_map(cls):
         return {
-            'time': [cls.per_day, cls.per_hour],
+            'time': [cls.per_day, cls.per_weekday, cls.per_hour],
             'counts': [cls.per_sender, cls.per_sender_media, cls.unique_messages],
             'cloud': [cls.full_wordcloud, cls.per_sender_wordclouds],
         }
@@ -185,26 +185,28 @@ class Analyzer:
 
     def per_day(self):
         print('Analyzing messages by day...')
-        # Dates
         per_day = self.df.groupby(['day', 'sender']).size().unstack(level=0)
         per_day = per_day.reindex(columns=self.all_days_range)
         per_day.fillna(0, inplace=True)
         per_day = per_day.T
-        # Weekdays
+        # Figures
+        labels = {'day': 'Date', 'sender': 'Sender', 'value': 'Messages'}
+        fig = px.bar(per_day, title='Messages per day (stacked)', labels=labels)
+        self.add_figure(fig, 'time')
+        fig = px.bar(per_day, barmode='group', title='Messages per day', labels=labels)
+        self.add_figure(fig, 'time')
+
+    def per_weekday(self):
+        print('Analyzing messages by weekday...')
         per_weekday = self.df.groupby(['weekday', 'sender']).size().unstack(level=0)
         per_weekday = per_weekday.reindex(columns=self.all_weekdays)
         per_weekday.fillna(0, inplace=True)
         per_weekday = per_weekday.T
-        day_labels = {'day': 'Date', 'sender': 'Sender', 'value': 'Messages'}
-        weekday_labels = {'weekday': 'Day', 'sender': 'Sender', 'value': 'Messages'}
         # Figures
-        fig = px.bar(per_day, title='Messages per day (stacked)', labels=day_labels)
+        labels = {'weekday': 'Day', 'sender': 'Sender', 'value': 'Messages'}
+        fig = px.bar(per_weekday, title='Messages per weekday (stacked)', labels=labels)
         self.add_figure(fig, 'time')
-        fig = px.bar(per_day, barmode='group', title='Messages per day', labels=day_labels)
-        self.add_figure(fig, 'time')
-        fig = px.bar(per_weekday, title='Messages per weekday (stacked)', labels=weekday_labels)
-        self.add_figure(fig, 'time')
-        fig = px.bar(per_weekday, barmode='group', title='Messages per weekday', labels=weekday_labels)
+        fig = px.bar(per_weekday, barmode='group', title='Messages per weekday', labels=labels)
         self.add_figure(fig, 'time')
 
     def per_hour(self):
