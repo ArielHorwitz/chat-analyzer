@@ -11,12 +11,6 @@ import util
 import plotly_html
 
 
-try:
-    print(f'Loading language data...')
-    NLP = spacy.load('en_core_web_sm')
-except OSError:
-    raise RuntimeError(f'Missing data to download. Please run the following command from within your venv: "python -m spacy download en_core_web_sm"')
-
 DATE_FORMAT = 'YYYY-MM-DD HH:mm:ss'
 MEDIA_MESSAGE = '<Media omitted>'
 
@@ -136,15 +130,25 @@ class Importer:
 
 
 class Analyzer:
-    def __init__(self, df, output_folder, font_path=None):
+    def __init__(self, df, output_folder, font_path=None, lang_code='en'):
         self.figures = defaultdict(list)
         self.df = df
         self.output_folder = output_folder
         self.font_path = None if font_path is None else Path(font_path)
         self.all_days_range = self._all_days_range()
+        self.lang_code = lang_code
+        self.nlp = self._get_nlp()
 
     def add_figure(self, fig, category):
         self.figures[category].append(fig)
+
+    def _get_nlp(self):
+        print(f'Loading {self.lang_code} language data...')
+        try:
+            return spacy.load(f'{self.lang_code}_core_web_sm')
+        except OSError:
+            print(f'Missing data to download. Please run the following command from within your venv: "python -m spacy download {self.lang_code}_core_web_sm"')
+        return None
 
     @classmethod
     def _get_analyses_map(cls):
@@ -293,7 +297,10 @@ class Analyzer:
                 return False
             return True
 
-        doc = NLP(text)
+        if self.nlp is None:
+            print(f'Missing language data for wordcloud. Please run the following command from within your venv: "python -m spacy download {self.lang_code}_core_web_sm"')
+            return
+        doc = self.nlp(text)
         words = [token.text.lower() for token in doc if interesting_pos(token)]
         unique_words = set(words)
         word_counts = Counter(words)
