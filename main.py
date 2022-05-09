@@ -150,7 +150,7 @@ class Analyzer:
     def _get_analyses_map(cls):
         return {
             'time': [cls.per_day, cls.per_weekday, cls.per_hour],
-            'counts': [cls.per_sender, cls.per_sender_media, cls.unique_messages],
+            'counts': [cls.per_sender, cls.per_sender_media, cls.common_messages],
             'cloud': [cls.full_wordcloud, cls.per_sender_wordclouds],
         }
 
@@ -240,15 +240,15 @@ class Analyzer:
         fig = px.pie(media_per_sender, names=media_per_sender.index, values='Messages', title='Media messages per person')
         self.add_figure(fig, 'counts')
 
-    def unique_messages(self):
-        print(f'Analyzing unique messages...')
+    def common_messages(self):
+        print(f'Analyzing common messages...')
         message_counts = self.df.groupby('message').count()['sender']
         message_counts = message_counts.sort_values(ascending=False)
         message_counts = message_counts[message_counts > 1]
         mc_strs = []
         for idx, count in message_counts.iteritems():
             mc_strs.append(f'{count} - {idx}')
-        util.file_dump(self.output_folder / 'unique_message_counts.txt', '\n'.join(mc_strs))
+        util.file_dump(self.output_folder / 'common_messages.txt', '\n'.join(mc_strs))
 
     def full_wordcloud(self):
         all_text = ' '.join(self.df['message'])
