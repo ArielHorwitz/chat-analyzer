@@ -154,7 +154,7 @@ class Analyzer:
             'cloud': [cls.full_wordcloud, cls.per_sender_wordclouds],
         }
 
-    def analyze(self, show_dir=True, analyses=None):
+    def analyze(self, analyses=None):
         analyses_map = self._get_analyses_map()
         if not analyses:  # is None or empty list
             analyses = ['all']
@@ -164,15 +164,13 @@ class Analyzer:
         for analysis_category in analyses:
             for analysis in analyses_map[analysis_category]:
                 analysis(self)
-        print(f'Output data to: {self.output_folder}')
-        if show_dir:
-            util.open_file_explorer(self.output_folder)
 
     def export_figures(self):
         plotly_html.write_css(self.output_folder)
         for category, figs in self.figures.items():
             file = self.output_folder / f'{category}.html'
             plotly_html.write_html(figs, file, title=category.capitalize())
+        print(f'Output data to: {self.output_folder}')
 
     def _all_days_range(self):
         raw_days = sorted(self.df.groupby('day').count().index)
@@ -290,13 +288,15 @@ def main():
         clear=arg_space.clear, force_clear=arg_space.force_clear,
         ignore=[Importer.CACHED_DF_NAME],
         )
+    if arg_space.show_output:
+        util.open_file_explorer(output_dir)
     df = Importer(
         import_file=arg_space.file, output_folder=output_dir,
         mode=arg_space.mode, line_limit=arg_space.line_limit,
         anonymize_senders=arg_space.anonymize, cache_data=arg_space.cache_data,
         ).df
     a = Analyzer(df, output_folder=output_dir, font_path=arg_space.font_path)
-    a.analyze(show_dir=arg_space.show_output, analyses=arg_space.analyses)
+    a.analyze(analyses=arg_space.analyses)
     a.export_figures()
 
 
