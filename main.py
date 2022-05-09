@@ -185,15 +185,15 @@ class Analyzer:
 
     def per_day(self):
         print('Analyzing messages by day...')
-        per_day = self.df.groupby(['day', 'sender']).size().unstack(level=0)
-        per_day = per_day.reindex(columns=self.all_days_range)
-        per_day.fillna(0, inplace=True)
-        per_day = per_day.T
+        per_day_grouped = self.df.groupby(['day', 'sender']).size()
+        per_day = per_day_grouped.index.to_frame()
+        per_day['messages'] = per_day_grouped
         # Figures
-        labels = {'day': 'Date', 'sender': 'Sender', 'value': 'Messages'}
-        fig = px.bar(per_day, title='Messages per day (stacked)', labels=labels)
+        labels = {'day': 'Date', 'sender': 'Sender'}
+        fig_args = dict(x='day', y='messages', nbins=100, color='sender', labels=labels)
+        fig = px.histogram(per_day, title='Messages per day (stacked)', **fig_args)
         self.add_figure(fig, 'time')
-        fig = px.bar(per_day, barmode='group', title='Messages per day', labels=labels)
+        fig = px.histogram(per_day, title='Messages per day', barmode='group', **fig_args)
         self.add_figure(fig, 'time')
 
     def per_weekday(self):
