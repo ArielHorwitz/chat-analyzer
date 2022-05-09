@@ -44,6 +44,10 @@ def parse_args():
         default=True,
         help='Apply a softer filter for wordcloud words')
     parser.add_argument(
+        '--custom-filter', dest='custom_word_filter',
+        type=Path, default=None,
+        help='Supply a file with words to filter')
+    parser.add_argument(
         '-o', dest='output',
         type=Path, default=None,
         help='Directory to save analyzed data')

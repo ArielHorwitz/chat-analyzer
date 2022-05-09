@@ -133,7 +133,7 @@ class Importer:
 
 class Analyzer:
     def __init__(self, df, output_folder, font_path=None,
-            lang_code='en', strong_pos_filter=True,
+            lang_code='en', strong_pos_filter=True, custom_word_filter=None,
         ):
         self.figures = defaultdict(list)
         self.df = df
@@ -143,6 +143,7 @@ class Analyzer:
         self.all_days_range = self._all_days_range()
         self.lang_code = lang_code
         self.nlp = self._get_nlp()
+        self.custom_word_filter = set() if custom_word_filter is None else set(custom_word_filter)
         self.strong_pos_filter = strong_pos_filter
 
     def add_figure(self, fig, category):
@@ -320,6 +321,9 @@ class Analyzer:
         if self.strong_pos_filter and token.pos_ in self.uninteresting_pos:
             # Filter uninteresting parts of speech
             return False
+        if token.text in self.custom_word_filter:
+            # Filter words from custom filter
+            return False
         if len(token.shape_) <= 1:
             # Filter emojis
             return False
@@ -358,6 +362,14 @@ def main():
         )
     if arg_space.show_output:
         util.open_file_explorer(output_dir)
+    custom_word_filter = None
+    if isinstance(arg_space.custom_word_filter, Path):
+        if arg_space.custom_word_filter.is_file():
+            t = util.file_load(arg_space.custom_word_filter)
+            custom_word_filter = set(t.split())
+            print(f'Filtering {len(custom_word_filter)} custom words.')
+        else:
+            raise FileNotFoundError(f'Cannot find custom word filter file: {arg_space.custom_word_filter}')
     df = Importer(
         import_file=arg_space.file, output_folder=output_dir,
         mode=arg_space.mode, line_limit=arg_space.line_limit,
@@ -366,6 +378,7 @@ def main():
     a = Analyzer(df,
         output_folder=output_dir, font_path=arg_space.font_path,
         lang_code=arg_space.lang_code, strong_pos_filter=arg_space.strong_filter,
+        custom_word_filter=custom_word_filter,
     )
     a.analyze(analyses=arg_space.analyses)
     a.export_figures()
