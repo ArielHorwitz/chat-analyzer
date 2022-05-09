@@ -22,7 +22,7 @@ def parse_args():
         type=Path, default=None,
         help='File to import and analyze')
     parser.add_argument(
-        '-l', dest='line_limit',
+        '--line-limit', dest='line_limit',
         type=int, default=0,
         help='Maximum number of lines to import from file')
     parser.add_argument(
@@ -35,6 +35,10 @@ def parse_args():
         '-a', dest='analyses',
         type=str, default='', nargs='*',
         help='Analyses, any combination of: all, time, counts, cloud')
+    parser.add_argument(
+        '-l', dest='lang_code',
+        type=str, default='en',
+        help='Analysis language code, e.g. en, nl, zh, etc. See: https://spacy.io/usage/models/#languages')
     parser.add_argument(
         '-o', dest='output',
         type=Path, default=None,
