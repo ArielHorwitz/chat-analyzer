@@ -130,7 +130,9 @@ class Importer:
 
 
 class Analyzer:
-    def __init__(self, df, output_folder, font_path=None, lang_code='en'):
+    def __init__(self, df, output_folder, font_path=None,
+            lang_code='en', strong_pos_filter=True,
+        ):
         self.figures = defaultdict(list)
         self.df = df
         self.output_folder = output_folder
@@ -138,6 +140,7 @@ class Analyzer:
         self.all_days_range = self._all_days_range()
         self.lang_code = lang_code
         self.nlp = self._get_nlp()
+        self.strong_pos_filter = strong_pos_filter
 
     def add_figure(self, fig, category):
         self.figures[category].append(fig)
@@ -272,48 +275,76 @@ class Analyzer:
 
     def generate_wordcloud(self, text, name):
         # Tokenize
-        uninteresting_pos = [
-            'NUM', # numeral
-            'ADP', # adposition
-            'PART', # particle
-            'DET', # determiner
-            'CCONJ', # coordinating conjunction
-            'SCONJ', # subordinating conjunction
-            'AUX', # auxiliary
-            'PRON', # pronouns
-            'PUNCT', # punctuation
-            'SYM', # symbol
-            'X',  # other
-        ]
-        def interesting_pos(token):
-            # Filter uninteresting parts of speech
-            if token.pos_ in uninteresting_pos:
-                return False
-            # Filter emojis
-            if len(token.shape_) <= 1:
-                return False
-            # Filter whitespaces
-            if token.tag_ == '_SP':
-                return False
-            return True
-
         if self.nlp is None:
             print(f'Missing language data for wordcloud. Please run the following command from within your venv: "python -m spacy download {self.lang_code}_core_web_sm"')
             return
         doc = self.nlp(text)
-        words = [token.text.lower() for token in doc if interesting_pos(token)]
+        words = [token.text.lower() for token in doc if self.interesting_pos(token)]
         unique_words = set(words)
         word_counts = Counter(words)
         # Wordcloud
         wc_kwargs = {
             'width': 1200,
             'height': 800,
-            'max_words': 500,
+            'max_words': 200,
         }
         if self.font_path is not None and self.font_path.is_file():
             wc_kwargs |= {'font_path': str(self.font_path)}
         wc = WordCloud(**wc_kwargs).generate_from_frequencies(word_counts)
         wc.to_file(self.output_folder / f'wordcloud-{name}.png')
+
+    # Tokeniation
+    very_uninteresting_pos = set([
+        'NUM', # numeral
+        'PUNCT', # punctuation
+        'SYM', # symbol
+        'X',  # other
+    ])
+    uninteresting_pos = set([
+        'ADP', # adposition
+        'PART', # particle
+        'DET', # determiner
+        'CCONJ', # coordinating conjunction
+        'SCONJ', # subordinating conjunction
+        'AUX', # auxiliary
+        'PRON', # pronouns
+    ])
+
+    def interesting_pos(self, token):
+        if token.pos_ in self.very_uninteresting_pos:
+            # Filter very uninteresting parts of speech
+            return False
+        if self.strong_pos_filter and token.pos_ in self.uninteresting_pos:
+            # Filter uninteresting parts of speech
+            return False
+        if len(token.shape_) <= 1:
+            # Filter emojis
+            return False
+        if token.tag_ == '_SP':
+            # Filter whitespaces
+            return False
+        return True
+
+    def debug_tokens(self):
+        text = ' '.join(self.df['message'])
+        doc = self.nlp(text)
+        legend = '\t'.join([
+            'text', 'lemma_', 'pos_', 'tag_', 'dep_',
+            'shape_', 'is_alpha', 'is_stop'
+        ])
+        for i, t in enumerate(doc[:1_000]):
+            if i % 50 == 0:
+                print('='*30)
+                print(legend)
+                print('='*30)
+            print(self.token_summary(t))
+
+    @staticmethod
+    def token_summary(token):
+        return '\t'.join(str(_) for _ in [
+            token.text, token.lemma_, token.pos_, token.tag_, token.dep_,
+            token.shape_, token.is_alpha, token.is_stop
+        ])
 
 
 def main():
@@ -329,7 +360,10 @@ def main():
         mode=arg_space.mode, line_limit=arg_space.line_limit,
         anonymize_senders=arg_space.anonymize, cache_data=arg_space.cache_data,
         ).df
-    a = Analyzer(df, output_folder=output_dir, font_path=arg_space.font_path)
+    a = Analyzer(df,
+        output_folder=output_dir, font_path=arg_space.font_path,
+        lang_code=arg_space.lang_code, strong_pos_filter=True,
+    )
     a.analyze(analyses=arg_space.analyses)
     a.export_figures()
 
