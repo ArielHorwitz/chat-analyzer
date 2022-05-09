@@ -268,8 +268,33 @@ class Analyzer:
 
     def generate_wordcloud(self, text, name):
         # Tokenize
+        uninteresting_pos = [
+            'NUM', # numeral
+            'ADP', # adposition
+            'PART', # particle
+            'DET', # determiner
+            'CCONJ', # coordinating conjunction
+            'SCONJ', # subordinating conjunction
+            'AUX', # auxiliary
+            'PRON', # pronouns
+            'PUNCT', # punctuation
+            'SYM', # symbol
+            'X',  # other
+        ]
+        def interesting_pos(token):
+            # Filter uninteresting parts of speech
+            if token.pos_ in uninteresting_pos:
+                return False
+            # Filter emojis
+            if len(token.shape_) <= 1:
+                return False
+            # Filter whitespaces
+            if token.tag_ == '_SP':
+                return False
+            return True
+
         doc = NLP(text)
-        words = [token.text.lower() for token in doc]
+        words = [token.text.lower() for token in doc if interesting_pos(token)]
         unique_words = set(words)
         word_counts = Counter(words)
         # Wordcloud
