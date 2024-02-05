@@ -1,21 +1,6 @@
 # Chat analyzer
 A simple chat log analyzer.
 
-### Installation
-Install requirements (consider using a [virtual environment](https://docs.python.org/3/tutorial/venv.html)):
-
-`pip install -r requirements.txt`
-
-The analysis requires language data:
-
-`python -m spacy download en_core_web_sm`
-
-To run:
-
-`python main.py --help`
-
-### Installation
-
 ### Features
 - Import whatsapp chats (as exported to text)
 - Generate random chats
@@ -27,3 +12,28 @@ To run:
 - Messages per person
 - Most common unique messages
 - Wordclouds
+
+### Installation
+Assuming you have [pyenv](https://github.com/pyenv/pyenv) and [poetry](https://python-poetry.org/) installed:
+```
+poetry install
+```
+
+The analysis requires language data:
+```
+poetry run python -m spacy download en_core_web_sm
+```
+
+### Basic usage
+For new or updated chats:
+```
+poetry run python analyzer/main.py -m whatsapp -f path/to/chat.txt -o output/dir/ --cache -a all
+```
+For reanalyzing the same chat:
+```
+poetry run python analyzer/main.py -m cached -o output/dir/ -a all
+```
+See more options:
+```
+poetry run python analyzer/main.py --help
+```
